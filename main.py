@@ -1,6 +1,9 @@
 import requests
 from pgeocode import Nominatim
 from requests import HTTPError
+import math
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 DEFAULT_ZIP_CODE = "80223"
 BASE_URL = "https://api.weather.gov/"
@@ -22,6 +25,30 @@ def check_response(response):
     if not response.ok:
         error_data = response.json()
         raise HTTPError(f"Error occurred while trying to check weather api: {error_data['status']} {error_data['detail']} {error_data['correlationId']}")
+
+def find_distance_pythagorean(lat1, lon1, lat2, lon2):
+    # get our target lat and lon and ones from list and calculate the distance between them
+    lat_diff = lat2 - lat1
+    lon_diff = lon2 - lon1
+    return math.sqrt(lat_diff ** 2 + lon_diff ** 2)
+
+def get_station_observations(station_id, start_time=None, end_time=None):
+    #limiting this to last 7 days for simplicity
+    try:
+        observations_url = f"{BASE_URL}/stations/{station_id}/observations?start={start_time}&end={end_time}"
+        response = requests.get(observations_url)
+        check_response(response)
+        observations_data = response.json()
+
+        observations = observations_data.get('features', [])
+        if not observations:
+            raise Exception("No observations found")
+
+        return observations
+    except Exception as e:
+        print(f"Error in get_station_observations: {e}")
+        return None
+
 
 def get_closest_weather_station(lat, lon):
     station_url = f"{BASE_URL}points/{lat},{lon}"
@@ -46,21 +73,100 @@ def get_closest_weather_station(lat, lon):
         print(response_data)
 
         stations = response_data.get('features', [])
+        print(stations)
         if not stations:
             raise Exception(f"No weather stations found for gridpoints {grid_id} {grid_x} {grid_y}")
 
+        min_distance = float('inf')
+        closest_station = None
+
+        #we are assuming the list of statinos is small enough to iterate through all of them
+        # for enhancement it may be good to filter out based on some min/max bounds
+        for station in stations:
+            station_coords = station.get('geometry', {}).get('coordinates', [])
+            if len(station_coords) != 2:
+                continue
+
+            station_lat, station_lon = station_coords[1], station_coords[0]
+
+            distance = find_distance_pythagorean(lat, lon, station_lat, station_lon)
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_station = station
+
+        if not closest_station:
+            raise Exception("Failed to find the closest weather station")
+
+        station_properties = closest_station.get('properties', {})
+        station_id = station_properties.get('stationIdentifier')
+
+        if not station_id:
+            raise Exception("Failed to find the station identifier")
+
+        print(station_id)
+
+        return station_id
 
     except Exception as e:
         # mormally we'd log this as an error but printing for simplicity
         print(f"Error occurred trying to find weather station: {e}")
         return None
 def get_weather_data(zip_code=DEFAULT_ZIP_CODE):
+   try:
     lat_lon = get_lat_lon_from_zip(zip_code)
     if lat_lon is None:
         raise Exception("Error occurred while trying to get lat/lon from zip code")
     lat, lon = lat_lon
-    station_data = get_closest_weather_station(lat, lon)
+    station_id = get_closest_weather_station(lat, lon)
 
+    end_date = datetime.utcnow().date() - timedelta(days=1)
+    start_date = end_date - timedelta(days=7)
+
+    start_time = datetime.combine(start_date, datetime.min.time()).isoformat() + "Z"
+    end_time = datetime.combine(end_date, datetime.max.time()).isoformat() + "Z"
+
+    observations = get_station_observations(station_id, start_time, end_time)
+
+    daily_temps = defaultdict(lambda: {"min": float('inf'), "max": float('-inf')})
+
+    for observation in observations:
+        properties = observation.get('properties', {})
+        temp_dict = properties.get('temperature', {})
+        temp = temp_dict.get('value') if temp_dict else None
+        timestamp = properties.get('timestamp')
+
+        if timestamp and temp is not None:
+            try:
+                # Parse timestamp
+                observation_datetime = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
+
+                observation_date = observation_datetime.date()
+
+                # Get current max and min for the date
+                current_max_temp = daily_temps[observation_date]["max"]
+                current_min_temp = daily_temps[observation_date]["min"]
+
+                if temp > current_max_temp:
+                    daily_temps[observation_date]["max"] = temp
+
+                if temp < current_min_temp:
+                    daily_temps[observation_date]["min"] = temp
+
+            except ValueError as e:
+                print(f"Error parsing timestamp: {e}")
+                continue
+
+    #make a list with date and then the daily high and low temps
+    data = []
+    for date, temps in daily_temps.items():
+        data.append({"day": str(date), "high": temps["max"], "low": temps["min"]})
+
+    print(data)
+
+   except Exception as e:
+    print(f"Error in get_weather: {e}")
+    return None
 
 #replace with desired zip or leave as Denver area
-get_weather_data()
+weather_data = get_weather_data()
