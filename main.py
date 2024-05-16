@@ -26,6 +26,7 @@ def check_response(response):
         error_data = response.json()
         raise HTTPError(f"Error occurred while trying to check weather api: {error_data['status']} {error_data['detail']} {error_data['correlationId']}")
 
+#this may not be accounting for all factors due to the curvature of the earth but should be close enough for this use case
 def find_distance_pythagorean(lat1, lon1, lat2, lon2):
     # get our target lat and lon and ones from list and calculate the distance between them
     lat_diff = lat2 - lat1
@@ -36,7 +37,7 @@ def get_station_observations(station_id, start_time=None, end_time=None):
     #limiting this to last 7 days for simplicity
     try:
         observations_url = f"{BASE_URL}/stations/{station_id}/observations?start={start_time}&end={end_time}"
-        response = requests.get(observations_url)
+        response = requests.get(observations_url, headers=USER_HEADERS)
         check_response(response)
         observations_data = response.json()
 
@@ -49,6 +50,44 @@ def get_station_observations(station_id, start_time=None, end_time=None):
         print(f"Error in get_station_observations: {e}")
         return None
 
+def process_daily_temps(observations):
+    daily_temps = defaultdict(lambda: {"min": float('inf'), "max": float('-inf')})
+
+    # I think using these max and min values for temp are correct because the minTempLast24Hours and
+    #     # maxTempLast24Hours are always null from API. Not sure if this is a bug.
+    for observation in observations:
+        properties = observation.get('properties', {})
+        temp_dict = properties.get('temperature', {})
+        temp = temp_dict.get('value') if temp_dict else None
+        timestamp = properties.get('timestamp')
+
+        if timestamp and temp is not None:
+            try:
+                # Parse timestamp
+                observation_datetime = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
+
+                observation_date = observation_datetime.date()
+
+                # Get current max and min for the date
+                current_max_temp = daily_temps[observation_date]["max"]
+                current_min_temp = daily_temps[observation_date]["min"]
+
+                if temp > current_max_temp:
+                            daily_temps[observation_date]["max"] = temp
+
+                if temp < current_min_temp:
+                    daily_temps[observation_date]["min"] = temp
+
+            except ValueError as e:
+                print(f"Error parsing timestamp: {e}")
+                continue
+
+        # make a list with date and then the daily high and low temps
+        data = []
+        for date, temps in daily_temps.items():
+            data.append({"day": str(date), "high": temps["max"], "low": temps["min"]})
+    return data
+
 
 def get_closest_weather_station(lat, lon):
     station_url = f"{BASE_URL}points/{lat},{lon}"
@@ -56,7 +95,6 @@ def get_closest_weather_station(lat, lon):
         response = requests.get(station_url, headers=USER_HEADERS)
         check_response(response)
         response_data = response.json()
-        print(response_data)
         grid_id = response_data.get('properties', {}).get('gridId')
         grid_x = response_data.get('properties', {}).get('gridX')
         grid_y = response_data.get('properties', {}).get('gridY')
@@ -73,7 +111,6 @@ def get_closest_weather_station(lat, lon):
         print(response_data)
 
         stations = response_data.get('features', [])
-        print(stations)
         if not stations:
             raise Exception(f"No weather stations found for gridpoints {grid_id} {grid_x} {grid_y}")
 
@@ -104,8 +141,6 @@ def get_closest_weather_station(lat, lon):
         if not station_id:
             raise Exception("Failed to find the station identifier")
 
-        print(station_id)
-
         return station_id
 
     except Exception as e:
@@ -120,6 +155,7 @@ def get_weather_data(zip_code=DEFAULT_ZIP_CODE):
     lat, lon = lat_lon
     station_id = get_closest_weather_station(lat, lon)
 
+    #get last 7 days so we don't have a large data set
     end_date = datetime.utcnow().date() - timedelta(days=1)
     start_date = end_date - timedelta(days=7)
 
@@ -128,41 +164,9 @@ def get_weather_data(zip_code=DEFAULT_ZIP_CODE):
 
     observations = get_station_observations(station_id, start_time, end_time)
 
-    daily_temps = defaultdict(lambda: {"min": float('inf'), "max": float('-inf')})
+    weather_data = process_daily_temps(observations)
 
-    for observation in observations:
-        properties = observation.get('properties', {})
-        temp_dict = properties.get('temperature', {})
-        temp = temp_dict.get('value') if temp_dict else None
-        timestamp = properties.get('timestamp')
-
-        if timestamp and temp is not None:
-            try:
-                # Parse timestamp
-                observation_datetime = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
-
-                observation_date = observation_datetime.date()
-
-                # Get current max and min for the date
-                current_max_temp = daily_temps[observation_date]["max"]
-                current_min_temp = daily_temps[observation_date]["min"]
-
-                if temp > current_max_temp:
-                    daily_temps[observation_date]["max"] = temp
-
-                if temp < current_min_temp:
-                    daily_temps[observation_date]["min"] = temp
-
-            except ValueError as e:
-                print(f"Error parsing timestamp: {e}")
-                continue
-
-    #make a list with date and then the daily high and low temps
-    data = []
-    for date, temps in daily_temps.items():
-        data.append({"day": str(date), "high": temps["max"], "low": temps["min"]})
-
-    print(data)
+    print(weather_data)
 
    except Exception as e:
     print(f"Error in get_weather: {e}")
