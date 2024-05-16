@@ -83,11 +83,10 @@ def process_daily_temps(observations):
                 continue
 
         # make a list with date and then the daily high and low temps
-        data = []
-        for date, temps in daily_temps.items():
-            data.append({"day": str(date), "high": temps["max"], "low": temps["min"]})
+    data = []
+    for date, temps in daily_temps.items():
+        data.append({"day": str(date), "high": temps["max"], "low": temps["min"]})
     return data
-
 
 def get_closest_weather_station(lat, lon):
     station_url = f"{BASE_URL}points/{lat},{lon}"
