@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*$py.class
+
+# build
+lib
+bin
+include
+
+# personal environment settings
+.DS_Store
+.vscode
+.idea
+.idea/*
+*/.coverage
+
