@@ -31,8 +31,8 @@ class TestWeatherFunctions(unittest.TestCase):
         ]
         data = process_daily_temps(observations)
         expected = [
-            {"day": "2023-05-01", "high": 71.6, "low": 68.0},
-            {"day": "2023-05-02", "high": 77.0, "low": 77.0}
+            {"day": "2023-05-01", "high": 22, "low": 20},
+            {"day": "2023-05-02", "high": 25, "low": 25}
         ]
         self.assertEqual(data, expected)
 
