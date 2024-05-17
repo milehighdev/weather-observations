@@ -24,7 +24,7 @@ def get_lat_lon_from_zip(zip_code):
 def check_response(response):
     if not response.ok:
         error_data = response.json()
-        raise HTTPError(f"Error occurred while trying to check weather api: {error_data['status']} {error_data['detail']} {error_data['correlationId']}")
+        raise HTTPError(f"Error occurred while trying to call weather api: {error_data['status']} {error_data['detail']} {error_data['correlationId']}")
 
 #this may not be accounting for all factors due to the curvature of the earth but should be close enough for this use case
 def find_distance_pythagorean(lat1, lon1, lat2, lon2):
@@ -51,6 +51,7 @@ def get_station_observations(station_id, start_time=None, end_time=None):
         return None
 
 def process_daily_temps(observations):
+    #using a defaultdict so we don't have to check if the key exists before updating
     daily_temps = defaultdict(lambda: {"min": float('inf'), "max": float('-inf')})
 
     # I think using these max and min values for temp are correct because the minTempLast24Hours and
@@ -68,13 +69,15 @@ def process_daily_temps(observations):
 
                 observation_date = observation_datetime.date()
 
-                # Get current max and min for the date
+                # Get current max and min in our dict
                 current_max_temp = daily_temps[observation_date]["max"]
                 current_min_temp = daily_temps[observation_date]["min"]
 
+                # if we find a temp that is bigger than our current max, update it
+                # use the date as our key so we don't have duplicate days
                 if temp > current_max_temp:
-                            daily_temps[observation_date]["max"] = temp
-
+                    daily_temps[observation_date]["max"] = temp
+                #if we find a temp that is smaller than our current min, update it
                 if temp < current_min_temp:
                     daily_temps[observation_date]["min"] = temp
 
@@ -82,7 +85,7 @@ def process_daily_temps(observations):
                 print(f"Error parsing timestamp: {e}")
                 continue
 
-        # make a list with date and then the daily high and low temps
+    # make a list with date and then the daily high and low temps
     data = []
     for date, temps in daily_temps.items():
         data.append({"day": str(date), "high": temps["max"], "low": temps["min"]})
@@ -107,7 +110,6 @@ def get_closest_weather_station(lat, lon):
         response = requests.get(station_url, headers=USER_HEADERS)
         check_response(response)
         response_data = response.json()
-        print(response_data)
 
         stations = response_data.get('features', [])
         if not stations:
@@ -168,7 +170,7 @@ def get_weather_data(zip_code=DEFAULT_ZIP_CODE):
     print(weather_data)
 
    except Exception as e:
-    print(f"Error in get_weather: {e}")
+    print(f"Error getting weather data: {e}")
     return None
 
 #replace with desired zip or leave as Denver area
