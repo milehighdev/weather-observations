@@ -124,7 +124,8 @@ def get_closest_weather_station(lat, lon):
             if len(station_coords) != 2:
                 continue
 
-            station_lat, station_lon = station_coords[1], station_coords[0]
+            station_lat = station_coords[1]
+            station_lon = station_coords[0]
 
             distance = find_distance_pythagorean(lat, lon, station_lat, station_lon)
 
