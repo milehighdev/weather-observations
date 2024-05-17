@@ -150,24 +150,24 @@ def get_closest_weather_station(lat, lon):
         return None
 def get_weather_data(zip_code=DEFAULT_ZIP_CODE):
    try:
-    lat_lon = get_lat_lon_from_zip(zip_code)
-    if lat_lon is None:
-        raise Exception("Error occurred while trying to get lat/lon from zip code")
-    lat, lon = lat_lon
-    station_id = get_closest_weather_station(lat, lon)
+        lat_lon = get_lat_lon_from_zip(zip_code)
+        if lat_lon is None:
+            raise Exception("Error occurred while trying to get lat/lon from zip code")
+        lat, lon = lat_lon
+        station_id = get_closest_weather_station(lat, lon)
 
-    #get last 7 days so we don't have a large data set
-    end_date = datetime.utcnow().date() - timedelta(days=1)
-    start_date = end_date - timedelta(days=7)
+        #get last 7 days so we don't have a large data set
+        end_date = datetime.utcnow().date() - timedelta(days=1)
+        start_date = end_date - timedelta(days=7)
 
-    start_time = datetime.combine(start_date, datetime.min.time()).isoformat() + "Z"
-    end_time = datetime.combine(end_date, datetime.max.time()).isoformat() + "Z"
+        start_time = datetime.combine(start_date, datetime.min.time()).isoformat() + "Z"
+        end_time = datetime.combine(end_date, datetime.max.time()).isoformat() + "Z"
 
-    observations = get_station_observations(station_id, start_time, end_time)
+        observations = get_station_observations(station_id, start_time, end_time)
 
-    weather_data = process_daily_temps(observations)
+        weather_data = process_daily_temps(observations)
 
-    print(weather_data)
+        print(weather_data)
 
    except Exception as e:
     print(f"Error getting weather data: {e}")
