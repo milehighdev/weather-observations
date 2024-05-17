@@ -4,9 +4,13 @@ from main import find_distance_pythagorean, process_daily_temps
 #Since we were making many API calls, I didn't do mocking to keep it simple
 class TestWeatherFunctions(unittest.TestCase):
 
-    def test_pythagorean_distance(self):
+    def test_pythagorean_distance_should_be_zero(self):
         distance = find_distance_pythagorean(34.103, -118.410, 34.103, -118.410)
         self.assertEqual(distance, 0)
+
+    def test_pythagorean_distance_should_be_correct(self):
+        distance = find_distance_pythagorean(34.103, -118.410, 34.104, -118.411)
+        self.assertAlmostEqual(distance, 0.00141421356, places=4)
 
     def test_calculate_daily_temps(self):
         observations = [
