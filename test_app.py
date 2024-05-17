@@ -9,8 +9,8 @@ class TestWeatherFunctions(unittest.TestCase):
         self.assertEqual(distance, 0)
 
     def test_pythagorean_distance_should_be_correct(self):
-        distance = find_distance_pythagorean(34.103, -118.410, 34.104, -118.411)
-        self.assertAlmostEqual(distance, 0.00141421356, places=4)
+        distance = find_distance_pythagorean(34.100, -114.45, 34.102, -118.14)
+        self.assertAlmostEqual(distance, 3.6921, places=4)
 
     def test_calculate_daily_temps(self):
         observations = [
