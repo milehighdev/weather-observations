@@ -33,8 +33,7 @@ def find_distance_pythagorean(lat1, lon1, lat2, lon2):
     lon_diff = lon2 - lon1
     return math.sqrt(lat_diff ** 2 + lon_diff ** 2)
 
-def get_station_observations(station_id, start_time=None, end_time=None):
-    #limiting this to last 7 days for simplicity
+def get_station_observations(station_id, start_time, end_time):
     try:
         observations_url = f"{BASE_URL}/stations/{station_id}/observations?start={start_time}&end={end_time}"
         response = requests.get(observations_url, headers=USER_HEADERS)
